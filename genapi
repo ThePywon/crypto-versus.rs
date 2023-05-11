@@ -1,0 +1,17 @@
+cd src
+output="use std::{convert::Infallible, collections::hash_map::HashMap};\nuse hyper::{Body, Request, Response, Method};\nuse futures::future::BoxFuture;\n"
+exports=""
+for file in api_endpoints/*; do
+  name=$(basename $file)
+  name="${name%.*}"
+  output="$(echo $output)mod $name;\n"
+done
+output="$(echo $output)\npub fn get_endpoints() -> HashMap<(&'static Method, &'static str), fn(Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>>> {\n\tlet mut endpoints = HashMap::new();\n"
+for file in api_endpoints/*; do
+  name=$(basename $file)
+  name="${name%.*}"
+  output="$(echo $output)\tfor endpoint in $name::get_endpoints() {\n\t\tendpoints.insert(($name::METHOD, endpoint), $name::run as fn(Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>>);\n\t}\n"
+done
+output="$(echo $output)\tendpoints\n}"
+echo -e $output > api_endpoints.rs
+cd ..
