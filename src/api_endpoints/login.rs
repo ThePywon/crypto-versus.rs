@@ -3,7 +3,7 @@ use hyper::{Body, Request, Response, Method, StatusCode};
 use serde::{Serialize, Deserialize};
 use futures::future::BoxFuture;
 use super::super::database::get_database;
-use mongodb::bson::{doc, Document};
+use mongodb::bson::{doc, Document, DateTime};
 use super::super::hash::hash;
 use sha2::Sha256;
 use base64::{engine::general_purpose, Engine as _};
@@ -37,15 +37,30 @@ pub fn run(req: Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infa
         let str_hash_pass = general_purpose::STANDARD.encode(&hashed_password);
 
         if let Some(user) = users.find_one(doc! { "username": data.username, "password": &str_hash_pass }, None).await.unwrap() {
-          
+
           let user_id = user.get_object_id("_id").unwrap();
-          if let None = tokens.find_one(doc! { "user_id": user_id }, None).await.unwrap() {
+          let old_token = tokens.find_one(doc! { "user_id": user_id }, None).await.unwrap();
+          let timestamp = DateTime::now().timestamp_millis() + 300000;
+          
+          if let None = old_token {
             
             let token = Uuid::new_v4().to_string();
             let mut hashed_token = [0; 32];
             hash::<Sha256>(&token, &std::env::var("TOKEN_SALT").unwrap(), &mut hashed_token);
             let str_hash_token = general_purpose::STANDARD.encode(&hashed_token);
-            tokens.insert_one(doc! { "user_id": user_id, "value": &str_hash_token }, None).await.unwrap();
+
+            tokens.insert_one(doc! { "user_id": user_id, "value": &str_hash_token, "valid_until": timestamp }, None).await.unwrap();
+
+            Ok(Response::new(Body::from(token)))
+          }
+          else if old_token.unwrap().get_i64("valid_until").unwrap() < DateTime::now().timestamp_millis() {
+
+            let token = Uuid::new_v4().to_string();
+            let mut hashed_token = [0; 32];
+            hash::<Sha256>(&token, &std::env::var("TOKEN_SALT").unwrap(), &mut hashed_token);
+            let str_hash_token = general_purpose::STANDARD.encode(&hashed_token);
+
+            tokens.update_one(doc! { "user_id": user_id }, doc! { "$set": { "value": &str_hash_token, "valid_until": timestamp } }, None).await.unwrap();
 
             Ok(Response::new(Body::from(token)))
           }
