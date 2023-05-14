@@ -51,7 +51,7 @@ pub fn run(req: Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infa
 
             tokens.insert_one(doc! { "user_id": user_id, "value": &str_hash_token, "valid_until": timestamp }, None).await.unwrap();
 
-            Ok(Response::new(Body::from(token)))
+            return Ok(Response::new(Body::from(token)))
           }
           else if old_token.unwrap().get_i64("valid_until").unwrap() < DateTime::now().timestamp_millis() {
 
@@ -62,22 +62,16 @@ pub fn run(req: Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infa
 
             tokens.update_one(doc! { "user_id": user_id }, doc! { "$set": { "value": &str_hash_token, "valid_until": timestamp } }, None).await.unwrap();
 
-            Ok(Response::new(Body::from(token)))
+            return Ok(Response::new(Body::from(token)))
           }
-          else {
-            Ok(Response::builder().status(StatusCode::TOO_MANY_REQUESTS).body(Body::empty()).unwrap())
-          }
+
+          return Ok(Response::builder().status(StatusCode::TOO_MANY_REQUESTS).body(Body::empty()).unwrap())
         }
-        else {
-          Ok(Response::builder().status(StatusCode::UNAUTHORIZED).body(Body::from("Invalid credentials")).unwrap())
-        }
-      }
-      else {
-        Ok(Response::builder().status(StatusCode::BAD_REQUEST).body(Body::empty()).unwrap())
+
+        return Ok(Response::builder().status(StatusCode::UNAUTHORIZED).body(Body::from("Invalid credentials")).unwrap())
       }
     }
-    else {
-      Ok(Response::builder().status(StatusCode::BAD_REQUEST).body(Body::empty()).unwrap())
-    }
+
+    Ok(Response::builder().status(StatusCode::BAD_REQUEST).body(Body::empty()).unwrap())
   })
 }
