@@ -4,6 +4,7 @@ use futures::future::BoxFuture;
 mod login;
 mod logout;
 mod signup;
+mod stats;
 
 pub fn get_endpoints() -> HashMap<(&'static Method, &'static str), fn(Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>>> {
 	let mut endpoints = HashMap::new();
@@ -15,6 +16,9 @@ pub fn get_endpoints() -> HashMap<(&'static Method, &'static str), fn(Request<Bo
 	}
 	for endpoint in signup::get_endpoints() {
 		endpoints.insert((signup::METHOD, endpoint), signup::run as fn(Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>>);
+	}
+	for endpoint in stats::get_endpoints() {
+		endpoints.insert((stats::METHOD, endpoint), stats::run as fn(Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>>);
 	}
 	endpoints
 }

@@ -49,18 +49,13 @@ pub fn run(req: Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infa
           
           tokens.insert_one(doc! { "user_id": user_id, "value": &str_hash_token, "valid_until": timestamp }, None).await.unwrap();
 
-          Ok(Response::new(Body::from(token)))
+          return Ok(Response::new(Body::from(token)))
         }
-        else {
-          Ok(Response::builder().status(StatusCode::FORBIDDEN).body(Body::from("User already exists")).unwrap())
-        }
-      }
-      else {
-        Ok(Response::builder().status(StatusCode::BAD_REQUEST).body(Body::empty()).unwrap())
+        
+        return Ok(Response::builder().status(StatusCode::FORBIDDEN).body(Body::from("User already exists")).unwrap())
       }
     }
-    else {
-      Ok(Response::builder().status(StatusCode::BAD_REQUEST).body(Body::empty()).unwrap())
-    }
+    
+    Ok(Response::builder().status(StatusCode::BAD_REQUEST).body(Body::empty()).unwrap())
   })
 }
