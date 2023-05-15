@@ -1,10 +1,12 @@
 use std::{convert::Infallible, collections::hash_map::HashMap};
 use hyper::{Body, Request, Response, Method};
 use futures::future::BoxFuture;
+
 mod login;
 mod logout;
 mod signup;
-mod stats;
+use user::stats;
+mod user;
 
 pub fn get_endpoints() -> HashMap<(&'static Method, &'static str), fn(Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>>> {
 	let mut endpoints = HashMap::new();

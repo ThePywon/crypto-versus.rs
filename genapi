@@ -1,17 +1,73 @@
 cd src
-output="use std::{convert::Infallible, collections::hash_map::HashMap};\nuse hyper::{Body, Request, Response, Method};\nuse futures::future::BoxFuture;\n"
-exports=""
-for file in api_endpoints/*; do
-  name=$(basename $file)
-  name="${name%.*}"
-  output="$(echo $output)mod $name;\n"
-done
-output="$(echo $output)\npub fn get_endpoints() -> HashMap<(&'static Method, &'static str), fn(Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>>> {\n\tlet mut endpoints = HashMap::new();\n"
-for file in api_endpoints/*; do
-  name=$(basename $file)
-  name="${name%.*}"
-  output="$(echo $output)\tfor endpoint in $name::get_endpoints() {\n\t\tendpoints.insert(($name::METHOD, endpoint), $name::run as fn(Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>>);\n\t}\n"
-done
-output="$(echo $output)\tendpoints\n}"
-echo -e $output > api_endpoints.rs
+echo -e "use std::{convert::Infallible, collections::hash_map::HashMap};\nuse hyper::{Body, Request, Response, Method};\nuse futures::future::BoxFuture;\n" > api_endpoints.rs
+create_subfiles () {
+  if [ -z $1 ]; then
+    local f="api_endpoints"
+    local fname=""
+  else
+    local f=$1
+    local fname=$(basename $1)
+  fi
+
+  for folder in $f/*; do
+    if [ -d $folder ]; then
+      local subname=$(basename $folder)
+      for file in $folder/*; do
+        local name=$(basename $file)
+        name="${name%.*}"
+        echo "pub mod $name;" > $f/$subname.rs
+      done
+      create_subfiles "$f/$subname"
+    fi
+  done
+}
+get_endpoints () {
+  if [ -z $1 ]; then
+    local f="api_endpoints"
+    local fname=""
+  else
+    local f=$1
+    local fname=$(basename $1)
+  fi
+
+  for file in $f/*; do
+    local name=$(basename $file)
+    if [ ! -d $file ]; then
+      name="${name%.*}"
+      local modname=""
+      if [ -z $fname ]; then
+        echo -e "mod $name;" >> api_endpoints.rs
+      else
+        echo -e "use $fname::$name;" >> api_endpoints.rs
+      fi
+    else
+      get_endpoints "$f/$name"
+    fi
+  done
+}
+import_endpoints () {
+  if [ -z $1 ]; then
+    local f="api_endpoints"
+    local fname=""
+  else
+    local f=$1
+    local fname=$(basename $1)
+  fi
+
+  for file in $f/*; do
+    local name=$(basename $file)
+    fname="${file%.*}"
+    if [ ! -d $file ] && [ ! -d $fname ]; then
+      name="${name%.*}"
+      echo -e "\tfor endpoint in $name::get_endpoints() {\n\t\tendpoints.insert(($name::METHOD, endpoint), $name::run as fn(Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>>);\n\t}" >> api_endpoints.rs
+    elif [ -d $file ]; then
+      import_endpoints "$f/$name"
+    fi
+  done
+}
+create_subfiles
+get_endpoints
+echo -e "\npub fn get_endpoints() -> HashMap<(&'static Method, &'static str), fn(Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>>> {\n\tlet mut endpoints = HashMap::new();" >> api_endpoints.rs
+import_endpoints
+echo -e "\tendpoints\n}" >> api_endpoints.rs
 cd ..
