@@ -1,5 +1,6 @@
 cd src
 echo -e "use std::{convert::Infallible, collections::hash_map::HashMap};\nuse hyper::{Body, Request, Response, Method};\nuse futures::future::BoxFuture;\n" > api_endpoints.rs
+reset=1
 create_subfiles () {
   if [ -z $1 ]; then
     local f="api_endpoints"
@@ -15,7 +16,12 @@ create_subfiles () {
       for file in $folder/*; do
         local name=$(basename $file)
         name="${name%.*}"
-        echo "pub mod $name;" > $f/$subname.rs
+        if [ $reset -eq 1 ]; then
+          echo "pub mod $name;" > $f/$subname.rs
+          reset=0
+        else
+          echo "pub mod $name;" >> $f/$subname.rs
+        fi
       done
       create_subfiles "$f/$subname"
     fi

@@ -16,7 +16,7 @@ struct StatsData<'a> {
 pub const METHOD: &Method = &Method::POST;
 
 pub fn get_endpoints() -> Vec<&'static str> {
-  vec!["/stats", "/statistics"]
+  vec!["/account/stats", "/account/statistics"]
 }
 
 pub fn run(req: Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>> {
