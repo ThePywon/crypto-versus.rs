@@ -1,5 +1,5 @@
 use std::convert::Infallible;
-use hyper::{Body, Request, Response, Method, StatusCode};
+use hyper::{Body, Request, Response, Method, StatusCode, header::AUTHORIZATION};
 use futures::future::BoxFuture;
 use super::super::database::get_database;
 use mongodb::bson::{doc, Document};
@@ -15,7 +15,7 @@ pub fn get_endpoints() -> Vec<&'static str> {
 
 pub fn run(req: Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>> {
   Box::pin(async move {
-    let auth = req.headers().get("authorization");
+    let auth = req.headers().get(AUTHORIZATION);
 
     let db = get_database().await;
     let tokens = db.collection::<Document>("tokens");
