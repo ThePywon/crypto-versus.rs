@@ -9,6 +9,8 @@ use dotenvy;
 mod database;
 mod hash;
 use std::fs::File;
+use serde_json::json;
+use dojang::dojang::Dojang;
 
 #[tokio::main]
 async fn main() {
@@ -38,13 +40,18 @@ async fn req_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
   }
   else {
     let mut public_path = String::from("./src/public") + path;
-    if !public_path.ends_with(".html") {public_path += ".html"}
+    if public_path.split(".").last().unwrap().contains("/") {public_path += ".html"}
 
-    if let Ok(mut file) = File::open(public_path) {
+    println!("{}", public_path);
+
+    if let Ok(mut file) = File::open(&public_path) {
       if file.metadata().unwrap().is_file() {
         let mut content = String::new();
         file.read_to_string(&mut content).unwrap();
-        return Ok(Response::builder().body(Body::from(content)).unwrap())
+        let mut dj = Dojang::new();
+        dj.load("./src/public").unwrap();
+        let filename = public_path.split("/").last().unwrap();
+        return Ok(Response::builder().body(Body::from(dj.render(filename, json!({})).unwrap())).unwrap())
       }
     }
   }
