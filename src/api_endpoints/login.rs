@@ -18,7 +18,7 @@ struct LoginData<'a> {
 pub const METHOD: &Method = &Method::POST;
 
 pub fn get_endpoints() -> Vec<&'static str> {
-  vec!["/login", "/signin"]
+  vec!["login", "signin"]
 }
 
 pub fn run(req: Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>> {
