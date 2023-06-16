@@ -17,7 +17,7 @@ struct EditData<'a> {
 pub const METHOD: &Method = &Method::POST;
 
 pub fn get_endpoints() -> Vec<&'static str> {
-  vec!["/account/edit"]
+  vec!["account/edit"]
 }
 
 pub fn run(req: Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>> {
@@ -48,23 +48,19 @@ pub fn run(req: Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infa
               str_hash_pass = Some(general_purpose::STANDARD.encode(&hashed_password));
             }
             
-            let mut final_edit: Document;
+            let final_edit: Document;
 
-            if let Some(u) = data.username {
-              if let Some(p) = str_hash_pass {
-                final_edit = doc! { "username": u, "password": p };
-              }
-              else {
-                final_edit = doc! { "username": u };
-              }
+            if let (Some(u), Some(p)) = (data.username, &str_hash_pass) {
+              final_edit = doc! { "username": u, "password": p };
+            }
+            else if let Some(u) = data.username {
+              final_edit = doc! { "username": u };
+            }
+            else  if let Some(p) = &str_hash_pass {
+              final_edit = doc! { "password": p };
             }
             else {
-              if let Some(p) = str_hash_pass {
-                final_edit = doc! { "password": p };
-              }
-              else {
-                return Ok(Response::builder().status(StatusCode::BAD_REQUEST).body(Body::empty()).unwrap())
-              }
+              return Ok(Response::builder().status(StatusCode::BAD_REQUEST).body(Body::empty()).unwrap())
             }
 
             users.update_one(doc! { "_id": old_token.get_object_id("user_id").unwrap() }, doc! { "$set": final_edit }, None).await.unwrap();

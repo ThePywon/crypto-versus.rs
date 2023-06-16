@@ -10,7 +10,7 @@ use base64::{engine::general_purpose, Engine as _};
 pub const METHOD: &Method = &Method::POST;
 
 pub fn get_endpoints() -> Vec<&'static str> {
-  vec!["/logout", "/signout"]
+  vec!["logout", "signout"]
 }
 
 pub fn run(req: Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>> {

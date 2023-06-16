@@ -18,7 +18,7 @@ struct SignupData<'a> {
 pub const METHOD: &Method = &Method::POST;
 
 pub fn get_endpoints() -> Vec<&'static str> {
-  vec!["/signup"]
+  vec!["signup"]
 }
 
 pub fn run(req: Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>> {

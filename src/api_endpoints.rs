@@ -7,6 +7,7 @@ use account::stats;
 mod account;
 mod login;
 mod logout;
+mod refresh;
 mod signup;
 
 pub fn get_endpoints() -> HashMap<(&'static Method, &'static str), fn(Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>>> {
@@ -22,6 +23,9 @@ pub fn get_endpoints() -> HashMap<(&'static Method, &'static str), fn(Request<Bo
 	}
 	for endpoint in logout::get_endpoints() {
 		endpoints.insert((logout::METHOD, endpoint), logout::run as fn(Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>>);
+	}
+	for endpoint in refresh::get_endpoints() {
+		endpoints.insert((refresh::METHOD, endpoint), refresh::run as fn(Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>>);
 	}
 	for endpoint in signup::get_endpoints() {
 		endpoints.insert((signup::METHOD, endpoint), signup::run as fn(Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>>);

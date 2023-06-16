@@ -1,4 +1,5 @@
 use std::convert::Infallible;
+use std::io::Read;
 use std::net::SocketAddr;
 use hyper::{Body, Request, Response, Server, StatusCode};
 use hyper::service::{make_service_fn, service_fn};
@@ -7,6 +8,7 @@ use api_endpoints::get_endpoints;
 use dotenvy;
 mod database;
 mod hash;
+use std::fs::File;
 
 #[tokio::main]
 async fn main() {
@@ -27,11 +29,25 @@ async fn main() {
 
 async fn req_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
   dbg!(&req);
-  
-  if let Some(endpoint) = get_endpoints().get(&(req.method(), req.uri().path())) {
-    endpoint(req).await
+  let path = req.uri().path();
+
+  if path.starts_with("/api/") {
+    if let Some(endpoint) = get_endpoints().get(&(req.method(), &path[5..])) {
+      return endpoint(req).await
+    }
   }
   else {
-    Ok(Response::builder().status(StatusCode::NOT_FOUND).body(Body::empty()).unwrap())
+    let mut public_path = String::from("./src/public") + path;
+    if !public_path.ends_with(".html") {public_path += ".html"}
+
+    if let Ok(mut file) = File::open(public_path) {
+      if file.metadata().unwrap().is_file() {
+        let mut content = String::new();
+        file.read_to_string(&mut content).unwrap();
+        return Ok(Response::builder().body(Body::from(content)).unwrap())
+      }
+    }
   }
+
+  Ok(Response::builder().status(StatusCode::NOT_FOUND).body(Body::empty()).unwrap())
 }
