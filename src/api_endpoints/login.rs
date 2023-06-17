@@ -22,50 +22,57 @@ pub fn get_endpoints() -> Vec<&'static str> {
 }
 
 pub fn run(req: Request<Body>) -> BoxFuture<'static, Result<Response<Body>, Infallible>> {
-  Box::pin(async {
-    let body = hyper::body::to_bytes(req.into_body()).await;
+  Box::pin(async move {
+    let auth = req.headers().get("authorization");
 
     let db = get_database().await;
     let users = db.collection::<Document>("users");
     let tokens = db.collection::<Document>("tokens");
 
-    if let Result::Ok(data) = body {
-      if let Result::Ok(data) = serde_json::from_slice::<LoginData>(&data) {
+    if let Some(auth_value) = auth {
+      let raw_auth = general_purpose::STANDARD.decode(auth_value);
 
-        let mut hashed_password = [0; 32];
-        hash::<Sha256>(data.password, &std::env::var("USER_SALT").unwrap(), &mut hashed_password);
-        let str_hash_pass = general_purpose::STANDARD.encode(&hashed_password);
+      if let Result::Ok(data) = raw_auth {
+        let str_data = std::str::from_utf8(&data).unwrap();
 
-        if let Some(user) = users.find_one(doc! { "username": data.username, "password": &str_hash_pass }, None).await.unwrap() {
+        if str_data.contains(":") {
+          let (username, password) = str_data.split_once(":").unwrap();
 
-          let user_id = user.get_object_id("_id").unwrap();
-          let old_token = tokens.find_one(doc! { "user_id": user_id }, None).await.unwrap();
-          let timestamp = DateTime::now().timestamp_millis() + 300000;
-          
-          if let None = old_token {
+          let mut hashed_password = [0; 32];
+          hash::<Sha256>(password, &std::env::var("USER_SALT").unwrap(), &mut hashed_password);
+          let str_hash_pass = general_purpose::STANDARD.encode(&hashed_password);
+
+          if let Some(user) = users.find_one(doc! { "username": username, "password": &str_hash_pass }, None).await.unwrap() {
+
+            let user_id = user.get_object_id("_id").unwrap();
+            let old_token = tokens.find_one(doc! { "user_id": user_id }, None).await.unwrap();
+            let timestamp = DateTime::now().timestamp_millis() + 300000;
             
-            let token = Uuid::new_v4().to_string();
-            let mut hashed_token = [0; 32];
-            hash::<Sha256>(&token, &std::env::var("TOKEN_SALT").unwrap(), &mut hashed_token);
-            let str_hash_token = general_purpose::STANDARD.encode(&hashed_token);
+            if let None = old_token {
+              
+              let token = Uuid::new_v4().to_string();
+              let mut hashed_token = [0; 32];
+              hash::<Sha256>(&token, &std::env::var("TOKEN_SALT").unwrap(), &mut hashed_token);
+              let str_hash_token = general_purpose::STANDARD.encode(&hashed_token);
 
-            tokens.insert_one(doc! { "user_id": user_id, "value": &str_hash_token, "valid_until": timestamp }, None).await.unwrap();
+              tokens.insert_one(doc! { "user_id": user_id, "value": &str_hash_token, "valid_until": timestamp }, None).await.unwrap();
 
-            return Ok(Response::new(Body::from(token)))
+              return Ok(Response::new(Body::from(token)))
+            }
+            else if old_token.unwrap().get_i64("valid_until").unwrap() < DateTime::now().timestamp_millis() {
+
+              let token = Uuid::new_v4().to_string();
+              let mut hashed_token = [0; 32];
+              hash::<Sha256>(&token, &std::env::var("TOKEN_SALT").unwrap(), &mut hashed_token);
+              let str_hash_token = general_purpose::STANDARD.encode(&hashed_token);
+
+              tokens.update_one(doc! { "user_id": user_id }, doc! { "$set": { "value": &str_hash_token, "valid_until": timestamp } }, None).await.unwrap();
+
+              return Ok(Response::new(Body::from(token)))
+            }
+
+            return Ok(Response::builder().status(StatusCode::TOO_MANY_REQUESTS).body(Body::empty()).unwrap())
           }
-          else if old_token.unwrap().get_i64("valid_until").unwrap() < DateTime::now().timestamp_millis() {
-
-            let token = Uuid::new_v4().to_string();
-            let mut hashed_token = [0; 32];
-            hash::<Sha256>(&token, &std::env::var("TOKEN_SALT").unwrap(), &mut hashed_token);
-            let str_hash_token = general_purpose::STANDARD.encode(&hashed_token);
-
-            tokens.update_one(doc! { "user_id": user_id }, doc! { "$set": { "value": &str_hash_token, "valid_until": timestamp } }, None).await.unwrap();
-
-            return Ok(Response::new(Body::from(token)))
-          }
-
-          return Ok(Response::builder().status(StatusCode::TOO_MANY_REQUESTS).body(Body::empty()).unwrap())
         }
 
         return Ok(Response::builder().status(StatusCode::UNAUTHORIZED).body(Body::from("Invalid credentials")).unwrap())
