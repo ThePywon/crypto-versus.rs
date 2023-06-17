@@ -40,18 +40,23 @@ async fn req_handler(req: Request<Body>) -> Result<Response<Body>, Infallible> {
   }
   else {
     let mut public_path = String::from("./src/public") + path;
-    if public_path.split(".").last().unwrap().contains("/") {public_path += ".html"}
-
-    println!("{}", public_path);
+    // Default to '.ejs' when no extension in uri path
+    if public_path.rsplit_once(".").unwrap().1.contains("/") {public_path += ".ejs"}
 
     if let Ok(mut file) = File::open(&public_path) {
       if file.metadata().unwrap().is_file() {
+
         let mut content = String::new();
         file.read_to_string(&mut content).unwrap();
-        let mut dj = Dojang::new();
-        dj.load("./src/public").unwrap();
-        let filename = public_path.split("/").last().unwrap();
-        return Ok(Response::builder().body(Body::from(dj.render(filename, json!({})).unwrap())).unwrap())
+        
+        if public_path.ends_with(".ejs")  {
+          let mut dj = Dojang::new();
+          dj.add(String::new(), content).unwrap();
+          return Ok(Response::builder().body(Body::from(dj.render("", json!({})).unwrap())).unwrap())
+        }
+        else {
+          return Ok(Response::builder().body(Body::from(content)).unwrap())
+        }
       }
     }
   }
